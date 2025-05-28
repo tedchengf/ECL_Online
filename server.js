@@ -8,7 +8,7 @@ app.use(express.static(__dirname));
 
 // Serve the main experiment page
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'ECL_History.html'));
 });
 
 // Start the server
