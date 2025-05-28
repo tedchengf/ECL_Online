@@ -1,0 +1,31 @@
+{
+  "name": "ecl-online",
+  "version": "1.0.0",
+  "description": "Online experiment for ECL",
+  "main": "server.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tedchengf/ECL_Online.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tedchengf/ECL_Online/issues"
+  },
+  "homepage": "https://github.com/tedchengf/ECL_Online#readme",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
