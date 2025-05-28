@@ -1,0 +1,250 @@
+:root {
+	--sidebar-width: 18vw;
+	--main-width: 82vw;
+	--padding: 20px;
+	--cell-padding: 15px;
+	--gap: 10px;
+}
+
+h2{
+	width: 60%;
+	text-align: left;
+}
+
+p.explanations {
+	width: 60%;
+	flex-wrap: wrap;
+	text-align: left;
+}
+
+p.errors {
+	width: 60%;
+	color: crimson;
+	flex-wrap: wrap;
+	text-align: left;
+}
+
+p.stimuli {
+	width: 60%;
+	text-align: center;
+}
+
+img.stimuli {
+	width: calc((var(--main-width) - var(--padding) * 2) / 8); /* 1/8 of form width minus padding */
+	height: calc((var(--main-width) - var(--padding) * 2) / 8); /* Keep it square */
+	object-fit: contain;
+}
+
+img.past_stimuli {
+	width: calc((var(--sidebar-width) - var(--padding) * 2 - var(--cell-padding) * 2 - var(--gap) * 2) / 2); /* Half of sliders width minus padding and gap */
+	height: calc((var(--sidebar-width) - var(--padding) * 2 - var(--cell-padding) * 2 - var(--gap) * 2) / 2); /* Keep it square */
+	object-fit: contain;
+}
+
+img.symbols {
+	width: 75px;
+	height: 75px;
+	border-radius: 25px;
+	padding: 20px;
+	background: #c7c6c5;
+}
+
+table { 
+	border-collapse: separate;
+	border-spacing: 30px;
+}
+
+/* #rcorners1 {
+	border-radius: 25px;
+	background: #c7c6c5;
+	padding: 20px;
+	width: 200px;
+	height: 150px;
+  } */
+
+/* Add styles for the sliders section */
+#jspsych-survey-multi-select-sliders {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: var(--sidebar-width);
+	height: 100vh;
+	overflow-y: auto;
+	padding: var(--padding);
+	background-color: #f5f5f5;
+	border-right: 1px solid #ddd;
+	box-sizing: border-box;
+	transition: transform 0.3s ease;
+}
+
+/* Style for the trial container */
+#jspsych-survey-multi-select-sliders .trial-container {
+	background-color: white;
+	border-radius: 5px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	padding: var(--cell-padding);
+	margin-bottom: var(--gap);
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* Style for trial outcome text */
+#jspsych-survey-multi-select-sliders .trial-outcome {
+	text-align: left;
+	margin-bottom: var(--gap);
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* Style for trial images container */
+.trial-images {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 50px;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* Adjust image sizes to fit within container */
+#jspsych-survey-multi-select-sliders .past_stimuli {
+	width: calc((var(--sidebar-width) - var(--padding) * 2 - var(--cell-padding) * 2 - var(--gap)) / 2);
+	height: calc((var(--sidebar-width) - var(--padding) * 2 - var(--cell-padding) * 2 - var(--gap)) / 2);
+	object-fit: contain;
+}
+
+/* Adjust the main form to account for the sliders */
+#jspsych-survey-multi-select-form {
+	margin-left: var(--sidebar-width);
+	width: var(--main-width);
+	padding: var(--padding);
+	box-sizing: border-box;
+	transition: margin-left 0.3s ease;
+}
+
+/* Style for questions in main area */
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-question {
+	margin-left: 20px;  /* Add left margin to questions */
+}
+
+/* Style for options container */
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-option {
+	position: relative;
+	display: inline-block;
+	margin-left: 20px;  /* Add left margin to options */
+}
+
+/* Style for object selection checkboxes and images */
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-option input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	cursor: pointer;
+}
+
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-option img.symbols {
+	width: 75px;
+	height: 75px;
+	border-radius: 25px;
+	padding: 20px;
+	background: #c7c6c5;
+	border: 3px solid transparent;
+	transition: all 0.2s ease;
+}
+
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-option:hover img.symbols {
+	border-color: #2980b9;
+	box-shadow: 0 0 10px rgba(41, 128, 185, 0.2);
+}
+
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-option input[type="checkbox"]:checked + img.symbols {
+	border-color: #2980b9;
+	box-shadow: 0 0 10px rgba(41, 128, 185, 0.3);
+	background: #ecf0f1;
+}
+
+/* Keep the original checkbox styles for the prediction question */
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-question:last-child input[type="checkbox"] {
+	/* Hide the default checkbox */
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	
+	/* Create custom checkbox */
+	width: 20px;
+	height: 20px;
+	border: 2px solid #95a5a6;
+	border-radius: 4px;
+	margin-right: 10px;
+	position: relative;
+	cursor: pointer;
+	vertical-align: middle;
+	opacity: 1;
+}
+
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-question:last-child input[type="checkbox"]:checked {
+	background-color: #2980b9;
+	border-color: #2980b9;
+}
+
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-question:last-child input[type="checkbox"]:checked::after {
+	content: '✓';
+	position: absolute;
+	color: white;
+	font-size: 14px;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+
+#jspsych-survey-multi-select-form .jspsych-survey-multi-select-question:last-child input[type="checkbox"]:hover {
+	border-color: #2980b9;
+}
+
+/* Style for prediction options */
+.prediction-option {
+	display: inline-block;
+	padding: 10px 20px;
+	border: 2px solid #95a5a6;
+	border-radius: 5px;
+	background-color: white;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	margin: 0 10px;
+}
+
+.prediction-option:hover {
+	border-color: #2980b9;
+	background-color: #f7f9f9;
+}
+
+#jspsych-survey-multi-select-form input[type="checkbox"]:checked + .prediction-option {
+	background-color: #2980b9;
+	border-color: #2980b9;
+	color: white;
+}
+
+/* Style for history toggle button */
+.history-toggle-btn {
+	position: absolute;
+	right: 20px;
+	top: 20px;
+	padding: 8px 16px;
+	background-color: #2980b9;
+	color: white;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 14px;
+	transition: background-color 0.2s ease;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.history-toggle-btn:hover {
+	background-color: #3498db;
+}
+
+/* Style for continue button transition */
+.jspsych-btn {
+	transition: margin-left 0.3s ease !important;
+}
