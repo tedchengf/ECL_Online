@@ -11,6 +11,36 @@ var jsPsych = initJsPsych({
 /* create timeline */
 var timeline = [];
 var count = 0;
+var history_ever_accessed = false;
+
+// Register participant and get cell assignment at the start
+const participant_info = {
+	pid: jsPsych.data.getURLVariable('pid') || 'test_participant_' + Date.now(),
+	cell: 'default_cell',
+	prolific: false
+};
+
+const design_data = [{name: 'EREC'}];
+
+// Call getcell to register the subject
+fetch('/getcell', {
+	method: 'POST',
+	headers: {
+		'Content-Type': 'application/json',
+	},
+	body: JSON.stringify({
+		p_info: participant_info,
+		design: design_data
+	})
+})
+.then(response => response.text())
+.then(cell_data => {
+	console.log('Participant registered, cell assigned:', cell_data);
+	participant_info.cell = JSON.parse(cell_data);
+})
+.catch((error) => {
+	console.error('Error registering participant:', error);
+});
 
 var preload = {
 	type: jsPsychPreload,
@@ -132,7 +162,114 @@ var welcome_4 = {
 	choices: [messages.buttons.beginPractice]
 };
 
-timeline.push(welcome_1, welcome_2, welcome_3, welcome_4);
+// timeline.push(welcome_1, welcome_2, welcome_3, welcome_4);
+
+// Create welcome + attention check loop
+var welcome_and_check_loop = {
+    timeline: [
+        welcome_1,
+        welcome_2,
+        welcome_3,
+        welcome_4,
+        {
+            type: jsPsychSurveyMultiChoice,
+            questions: [
+                {
+                    prompt: "How many objects will you see in each trial?",
+                    options: [
+                        "1 object",
+                        "2 objects",
+                        "4 objects",
+                        "8 objects"
+                    ],
+                    required: true,
+                    horizontal: false,
+                    name: 'num_objects'
+                },
+                {
+                    prompt: "Does the position/order of the objects matter?",
+                    options: [
+                        "Yes, the order is important",
+                        "No, the order does not matter at all",
+                        "Only in some trials",
+                        "Only for certain objects"
+                    ],
+                    required: true,
+                    horizontal: false,
+                    name: 'position'
+                },
+                {
+                    prompt: "What is your most important task in this experiment?",
+                    options: [
+                        "Memorize all pairs of objects that explode",
+                        "Infer a rule that predicts explosions",
+                        "Check the consistency of the outcomes"
+                    ],
+                    required: true,
+                    horizontal: false,
+                    name: 'task'
+                }
+            ],
+            button_label: "Submit",
+            on_finish: function(data) {
+                // Check if answers are correct
+                const correct_answers = {
+                    num_objects: "2 objects",
+                    position: "No, the order does not matter at all",
+                    task: "Infer a rule that predicts explosions"
+                };
+                
+                // Add correctness to data
+                data.attention_check_correct = 
+                    data.response.num_objects === correct_answers.num_objects &&
+                    data.response.position === correct_answers.position &&
+                    data.response.task === correct_answers.task;
+            }
+        },
+        {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: function() {
+                const lastTrialData = jsPsych.data.getLastTrialData();
+                const lastTrial = lastTrialData.values()[0];
+
+                if (lastTrial.attention_check_correct) {
+                    return `
+                        <center>
+                        <h2>All answers are correct!</h2>
+                        <p class="explanations">Before starting the experiment, let's go through some practice trials for you to get familiar with the interface.</p>
+                        </center>
+                    `;
+                } else {
+                    return `
+                        <center>
+                        <h2>Some answers were incorrect</h2>
+                        <p class="explanations">Please review the instructions carefully and try again.</p>
+                        </center>
+                    `;
+                }
+            },
+            choices: function() {
+                const lastTrialData = jsPsych.data.getLastTrialData();
+                const lastTrial = lastTrialData.values()[0];
+                return lastTrial.attention_check_correct ? ["Begin Practice"] : ["Review Instructions"];
+            }
+        }
+    ],
+    loop_function: function() {
+        // Get the last trial's data (the feedback screen)
+        const lastTrialData = jsPsych.data.getLastTrialData();
+        const lastTrial = lastTrialData.values()[0];
+        
+        // Get the attention check trial data
+        const attentionCheckData = jsPsych.data.get().filter({trial_type: 'survey-multi-choice'}).values();
+        const lastAttentionCheck = attentionCheckData[attentionCheckData.length - 1];
+        
+        // Continue looping if the attention check was incorrect
+        return !lastAttentionCheck.attention_check_correct;
+    }
+};
+
+timeline.push(welcome_and_check_loop);
 
 //=============================================================================
 //                                 PRACTICE PHASE
@@ -349,6 +486,13 @@ function createPracticeOutputTrial(instructions) {
 			const prediction = lastTrial.prediction;
 			const truth = lastTrial.truth;
 			const isCorrect = prediction === truth;
+
+			// Add object information to the trial data
+			jsPsych.data.addDataToLastTrial({
+				Obj1: obj1_code,
+				Obj2: obj2_code,
+				truth: truth
+			});
 
 			// Play feedback sound
 			const audio = new Audio(isCorrect ? 'src/Correct.wav' : 'src/Incorrect.wav');
@@ -703,7 +847,7 @@ var training_instruction = {
 	`,
 	choices: [messages.buttons.beginExperiment],
 	on_load: function() {
-		// Clear all practice trial data
+		// Clear all data after practice trials are complete
 		jsPsych.data.reset();
 	}
 };
@@ -770,18 +914,20 @@ function createTrial(obj1_code, obj2_code, index, total_trials) {
 			const seq_id = obj1_code * obj2_code;
 			const truth = seq_truth[seq_id];
 			
+			// Store original trial data
 			data.Obj1 = obj1_code;
 			data.Obj2 = obj2_code;
-			data.prediction = data.response.prediction[0] === 'true';  // Convert string to boolean
-			data.truth = truth;  // Add the actual outcome
-			data.is_correct = data.prediction === truth;  // Add whether the prediction was correct
-			data.trial_number = index + 1;
-			console.log('Trial data stored:', data);
+			data.prediction = data.response.prediction[0] === 'true';
+			data.truth = truth;
+			data.is_correct = data.prediction === truth;
+			data.trial_number = index + 1;  // Start from 1
 		}
 	};
 }
 
 function createOutputTrial() {
+	let history_accessed = false;  // Track if they ever accessed history
+
 	return {
 		type: jsPsychHtmlButtonResponse,
 		stimulus: function() {
@@ -796,8 +942,7 @@ function createOutputTrial() {
 			const obj1_code = lastTrial.Obj1;
 			const obj2_code = lastTrial.Obj2;
 			const prediction = lastTrial.prediction;
-			const seq_id = obj1_code * obj2_code;
-			const truth = seq_truth[seq_id];
+			const truth = lastTrial.truth;  // Use truth from prediction trial
 			const isCorrect = prediction === truth;
 
 			// Play feedback sound
@@ -878,25 +1023,42 @@ function createOutputTrial() {
 						continueButton.style.marginLeft = isHidden ? '25vw' : '0';
 					}
 
-					// Log history access
-					if (isHidden) {  // Only log when showing history
-						// Log current trial access
-						jsPsych.data.addDataToLastTrial({
-							history_accessed_this_trial: true
-						});
-
-						// Log first-ever access
-						if (!history_ever_accessed) {
-							history_ever_accessed = true;
-							jsPsych.data.addDataToLastTrial({
-								history_first_access: true,
-								history_first_access_time: new Date().toISOString(),
-								history_first_access_trial: count
-							});
-						}
+					// If they're showing the history, mark it as accessed
+					if (isHidden) {
+						history_accessed = true;  // Once true, stays true
 					}
-				});
+
+					// Log first-ever access
+					if (isHidden && !history_ever_accessed) {
+						history_ever_accessed = true;
+						this.history_first_access = true;
+						this.history_first_access_time = new Date().toISOString();
+						this.history_first_access_trial = count;
+					}
+				}.bind(this));
 			}
+		},
+		on_finish: function(data) {
+			// Set history_accessed in the trial data - true if they ever accessed it
+			data.history_accessed = history_accessed;
+			
+			// Get the prediction trial (which should be the second-to-last trial)
+			const allTrials = jsPsych.data.get().filter({trial_type: 'survey-multi-select'}).values();
+			const lastPredictionTrial = allTrials[allTrials.length - 1]; // Get the most recent prediction trial
+			
+			// Store object codes from the prediction trial
+			data.Obj1 = lastPredictionTrial.Obj1;
+			data.Obj2 = lastPredictionTrial.Obj2;
+			data.truth = lastPredictionTrial.truth;
+			
+			// Debug: Check this outcome trial
+			console.log('Outcome trial data:', data);
+			console.log('Outcome trial rt:', data.rt);
+			console.log('Outcome trial rt type:', typeof data.rt);
+			console.log('History accessed:', data.history_accessed);
+			console.log('Object codes stored:', data.Obj1, data.Obj2);
+			console.log('Prediction trial object codes:', lastPredictionTrial.Obj1, lastPredictionTrial.Obj2);
+			console.log('Truth value:', data.truth);
 		}
 	};
 }
@@ -935,8 +1097,100 @@ test_pairs.forEach(([obj1_code, obj2_code], index) => {
 var export_trial = {
 	type: jsPsychHtmlButtonResponse,
 	stimulus: function() {
-		// Save the data
-		jsPsych.data.get().localSave('csv', 'experiment-data.csv');
+		// Transform data to database format
+		const all_trials = jsPsych.data.get().filter({trial_type: 'survey-multi-select'}).values();
+		const all_button_trials = jsPsych.data.get().filter({trial_type: 'html-button-response'}).values();
+		
+		// Filter out welcome/practice/instruction screens to get only outcome trials
+		const all_outcomes = all_button_trials.filter(trial => {
+			const is_outcome = trial.stimulus && trial.stimulus.includes('Outcome');
+			console.log('Trial stimulus:', trial.stimulus);
+			console.log('Is outcome:', is_outcome);
+			return is_outcome;
+		});
+		
+		console.log('All trials:', jsPsych.data.get().values());
+		console.log('Prediction trials:', all_trials);
+		console.log('All button trials:', all_button_trials);
+		console.log('Filtered outcome trials:', all_outcomes);
+		
+		// Create separate arrays for prediction and outcome trials
+		const prediction_trials = [];
+		const outcome_trials = [];
+		
+		// Process prediction trials
+		all_trials.forEach((prediction, index) => {
+			console.log('Processing prediction trial:', prediction);
+			prediction_trials.push({
+				exp_type: 'prediction',
+				exp_stim: JSON.stringify([prediction.Obj1, prediction.Obj2]),
+				response: prediction.prediction ? 'true' : 'false',
+				truth: prediction.truth,
+				rt: prediction.rt,
+				trial_number: index + 1,
+				jspsych: JSON.stringify({
+					obj1: prediction.Obj1,
+					obj2: prediction.Obj2,
+					prediction: prediction.prediction,
+					truth: prediction.truth,
+					trial_number: index + 1,
+					rt: prediction.rt
+				})
+			});
+		});
+		
+		// Process outcome trials
+		all_outcomes.forEach((outcome, index) => {
+			console.log('Processing outcome trial:', outcome);
+			console.log('Outcome Obj1:', outcome.Obj1, 'Outcome Obj2:', outcome.Obj2);
+			console.log('History accessed value:', outcome.history_accessed);
+			console.log('History accessed type:', typeof outcome.history_accessed);
+			outcome_trials.push({
+				exp_type: 'outcome',
+				exp_stim: JSON.stringify([outcome.Obj1, outcome.Obj2]),
+				response: null,  // Set response to NULL for outcome trials
+				rt: outcome.rt,
+				history_accessed: outcome.history_accessed === true,  // Ensure boolean value
+				trial_number: index + 1,
+				jspsych: JSON.stringify({
+					obj1: outcome.Obj1,
+					obj2: outcome.Obj2,
+					truth: outcome.truth,
+					trial_number: index + 1,
+					rt: outcome.rt,
+					history_accessed: outcome.history_accessed === true
+				})
+			});
+			console.log('Created outcome trial with stim:', JSON.stringify([outcome.Obj1, outcome.Obj2]));
+		});
+
+		console.log('Final prediction trials:', prediction_trials);
+		console.log('Final outcome trials:', outcome_trials);
+
+		// Combine all trials
+		const experiment_data = {
+			p_info: participant_info,  // Use the participant info from the beginning
+			design: design_data,
+			trials: [...prediction_trials, ...outcome_trials]
+		};
+
+		console.log('Final experiment data:', experiment_data);
+
+		// Send to server
+		fetch('/resultssave', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(experiment_data)
+		})
+		.then(response => response.json())
+		.then(data => {
+			console.log('Server response:', data);
+		})
+		.catch((error) => {
+			console.error('Error saving data:', error);
+		});
 		
 		return `
 			<div style="text-align: center;">
@@ -946,7 +1200,9 @@ var export_trial = {
 		`;
 	},
 	choices: [messages.buttons.close],
-	button_html: `<button class="jspsych-btn" style="background-color: #2980b9; color: white; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px;">${messages.buttons.close}</button>`
+	button_html: function(choice) {
+		return `<button class="jspsych-btn" style="background-color: #2980b9; color: white; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px;">${choice}</button>`;
+	}
 };
 
 timeline.push(export_trial);

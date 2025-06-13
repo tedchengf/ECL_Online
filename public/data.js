@@ -53,13 +53,18 @@ const objects_src = {
 }; 
 
 // Generate all possible pairs (including self-pairs)
-const object_pairs = [];
+let object_pairs = [];
 const object_codes = Object.keys(objects_src).map(Number);  // Convert string keys to numbers
+
+// Generate all pairs
 for (let i = 0; i < object_codes.length; i++) {
     for (let j = i; j < object_codes.length; j++) {
         object_pairs.push([object_codes[i], object_codes[j]]);
     }
 }
+
+// Take only the first 6 pairs for testing
+object_pairs = object_pairs.slice(0, 6);
 
 //=============================================================================
 //                                 MESSAGES
@@ -78,7 +83,7 @@ const messages = {
             text: `A 2-object combination is simply two objects placed near each other. Above is one such combination; <strong>their order does not matter at all.</strong> <br><br> In this experiment, you will go through a number of those combinations. <strong>As each combination is presented, you will be asked to predict whether it will explode, before witnessing the actual result and getting feedback.</strong> <br><br> <strong>We know that a determinstic rule governs the tiggering conditions for explosions, but it is your job to figure out what that rule is.</strong> At first you will just have to guess, but on the basis of the feedback you receive, you should gradually grasp this rule.`
         },
         instructions: {
-            text: `This experiments is divided into a <strong>training block</strong> and a <strong>testing block</strong>. In the training block, you are given feedback of your predictions and can acess the history of all past observations. Good use of these information will help you figure out the rule that governs the explosions. <strong>However, please refrain from taking notes of individual trials; our task is rule inference, not memorization.</strong><br><br>In the testing block, you will be tested on the same pairs of objects as in the training block, but you will not see the outcomes of your predictions nor the history. Please make your predictions based on the rule you inferred in the training block. <br><br>Before starting the experiment, let's go through some practice trials for you to get familiar with the interface.`
+            text: `This experiments is divided into a <strong>training block</strong> and a <strong>testing block</strong>. In the training block, you are given feedback of your predictions and can acess the history of all past observations. Good use of these information will help you figure out the rule that governs the explosions. <strong>However, please refrain from taking notes of individual trials; our task is rule inference, not memorization.</strong><br><br>In the testing block, you will be tested on the same pairs of objects as in the training block, but you will not see the outcomes of your predictions nor the history. Please make your predictions based on the rule you inferred in the training block. <br><br>To make sure that you understand the task correctly, you will be asked a few comprehension questions in the next page. You will need to answer all questions correctly to proceed.`
         }
     },
     practice: {
@@ -116,3 +121,4 @@ const messages = {
         notExplode: `Not Explode`
     }
 };
+

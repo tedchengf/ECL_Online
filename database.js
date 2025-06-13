@@ -10,10 +10,10 @@ async function create_table(pool, table_spec) {
 }
 
 async function test_and_create_table(pool, table_spec) {
-  //console.log ('*** Testing table ' + table_spec.name + '.')
+  console.log ('*** Testing table ' + table_spec.name + '.')
   if (!await table_exists(pool, table_spec.name)) {
     await create_table(pool, table_spec)
-    //console.log ('*** Table ' + table_spec.name + ' successfully created')
+    console.log ('*** Table ' + table_spec.name + ' successfully created')
   }
 }
 
@@ -21,7 +21,7 @@ async function insert_table(pool, table_spec, vals) {
   vals = comma_separated_array (vals)
   var query = "INSERT INTO " + table_spec.name + " VALUES(" + vals + ");"
   await pool.query(query)
-  //console.log ('*** Table ' + table_spec.name + ' insert successful')
+  console.log ('*** Table ' + table_spec.name + ' insert successful')
 }
 
 async function table_exists(pool, table_name) {
@@ -29,7 +29,7 @@ async function table_exists(pool, table_name) {
     "WHERE table_schema = 'public' AND table_name = $1);"
   var result = await pool.query(query, [table_name])
   var exists = result.rows[0].exists
-  //console.log ('*** State of ' + table_name + '\'s existence: ' + exists)
+  console.log ('*** State of ' + table_name + '\'s existence: ' + exists)
   return (exists)
 }
 
@@ -43,14 +43,14 @@ async function update_table(pool, table_spec, update_clause, where_clauses) {
   query = 
     "UPDATE " + table_spec.name + " SET " + update_clause + 
     " WHERE " + string_separated_array (where_clauses, " AND ") + ";"
-  //console.log (query)
+  console.log (query)
   await pool.query(query)
-  //console.log ('*** Table ' + table_spec.name + ' updated')
+  console.log ('*** Table ' + table_spec.name + ' updated')
 }
 
 async function delete_table(pool, table_name) {
   if (await table_exists(table_name)) {
-    //console.log ('*** Deleting table ' + table_name)
+    console.log ('*** Deleting table ' + table_name)
     query = "DROP TABLE " + table_name + ";"
     await pool.query(query)
     console.log ('*** Table ' + table_name + ' deleted')
@@ -58,9 +58,12 @@ async function delete_table(pool, table_name) {
 }
 
 async function test_and_create_database(pool, database) {
+  console.log('*** Starting database initialization check')
   for (let ti=0; ti < database.length; ti++) {
+    console.log(`*** Checking table ${database[ti].name}`)
     await test_and_create_table(pool, database[ti])
   }
+  console.log('*** Database initialization check complete')
 }
 
 async function delete_database(pool, database) {
