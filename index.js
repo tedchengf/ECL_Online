@@ -20,7 +20,7 @@ const cells_table = {
     
 const subjects_table = {
   name: 'subjects',
-  col_types: {pid: 'VARCHAR UNIQUE', cell: 'VARCHAR', state: 'VARCHAR'}   
+  col_types: {pid: 'VARCHAR UNIQUE', cell: 'VARCHAR', state: 'VARCHAR', notes_usage: 'VARCHAR'}   
 }
     
 const events_table = {
@@ -93,7 +93,7 @@ async function get_cell(req) {
   console.log ("*** Cell " + cell_json + " allocated to " + p_info.pid)
   
   // Add new subject to subjects table.
-   insert_vals = [p_info.pid, cell_json, 'started']
+   insert_vals = [p_info.pid, cell_json, 'started', null]
   await insert_table(pool, subjects_table, insert_vals.map(quote))
   console.log("*** Subject " + p_info.pid + " added to " + subjects_table.name + " table")    
 
@@ -161,7 +161,7 @@ async function write_exp_data(req) {
   console.log ("*** %d trials written to tables", trials.length)
 
   // Update subjects table. 
-  const update_clause = "state = 'completed'"
+  const update_clause = "state = 'completed'" + (p_info.took_notes ? ", notes_usage = " + quote(p_info.took_notes) : "")
   await update_table(pool, subjects_table, update_clause, ["pid=" + pid_s])
   console.log ("*** Subject " + p_info.pid + " logged as completed in " + subjects_table.name + " table")  
   

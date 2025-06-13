@@ -15,10 +15,28 @@ var history_ever_accessed = false;
 
 // Register participant and get cell assignment at the start
 const participant_info = {
-	pid: jsPsych.data.getURLVariable('pid') || 'test_participant_' + Date.now(),
+	pid: jsPsych.data.getURLVariable('pid') || 
+		 jsPsych.data.getURLVariable('PROLIFIC_PID') || 
+		 'test_participant_' + Date.now(),
 	cell: 'default_cell',
-	prolific: false
+	prolific: false,
+	prolific_info: {}
 };
+
+// Check if this is a Prolific participant
+const prolific_pid = jsPsych.data.getURLVariable('PROLIFIC_PID');
+const study_id = jsPsych.data.getURLVariable('STUDY_ID');
+const session_id = jsPsych.data.getURLVariable('SESSION_ID');
+
+if (prolific_pid) {
+	participant_info.prolific = true;
+	participant_info.pid = prolific_pid;
+	participant_info.prolific_info = {
+		prolific_id: prolific_pid,
+		study_id: study_id || '',
+		session_id: session_id || ''
+	};
+}
 
 const design_data = [{name: 'EREC'}];
 
@@ -208,6 +226,16 @@ var welcome_and_check_loop = {
                     required: true,
                     horizontal: false,
                     name: 'task'
+                },
+                {
+                    prompt: "Can you take notes during the experimen?",
+                    options: [
+                        "Yes",
+                        "No"
+                    ],
+                    required: true,
+                    horizontal: false,
+                    name: 'notes'
                 }
             ],
             button_label: "Submit",
@@ -216,14 +244,16 @@ var welcome_and_check_loop = {
                 const correct_answers = {
                     num_objects: "2 objects",
                     position: "No, the order does not matter at all",
-                    task: "Infer a rule that predicts explosions"
+                    task: "Infer a rule that predicts explosions",
+					notes: "No",
                 };
                 
                 // Add correctness to data
                 data.attention_check_correct = 
                     data.response.num_objects === correct_answers.num_objects &&
                     data.response.position === correct_answers.position &&
-                    data.response.task === correct_answers.task;
+                    data.response.task === correct_answers.task &&
+                    data.response.notes === correct_answers.notes;
             }
         },
         {
@@ -1093,10 +1123,37 @@ test_pairs.forEach(([obj1_code, obj2_code], index) => {
 	timeline.push(createTrial(obj1_code, obj2_code, index, test_pairs.length));
 });
 
+// Add final survey before completion
+var final_survey = {
+	type: jsPsychSurveyMultiChoice,
+	questions: [
+		{
+			prompt: "Before you leave, can you please let us know if use notes to complete the testing phase? You will receive your compensation regardless of your answer, so please answer honestly.",
+			options: [
+				"Yes, I recorded some or all 36 trials and their outcomes and use them to complete the testing phase.",
+				"Yes, But I only used my notes to write down some possible rules.",
+				"No, I did not use any notes.",
+			],
+			required: true,
+			horizontal: false,
+			name: 'took_notes'
+		}
+	],
+	button_label: "Submit",
+	on_finish: function(data) {
+		// Store the note-taking response
+		data.took_notes_response = data.response.took_notes;
+	}
+};
+
 // Add CSV export trial
 var export_trial = {
 	type: jsPsychHtmlButtonResponse,
 	stimulus: function() {
+		// Get the note-taking response from the previous trial
+		const surveyData = jsPsych.data.getLastTrialData().values()[0];
+		const tookNotes = surveyData.took_notes_response;
+		
 		// Transform data to database format
 		const all_trials = jsPsych.data.get().filter({trial_type: 'survey-multi-select'}).values();
 		const all_button_trials = jsPsych.data.get().filter({trial_type: 'html-button-response'}).values();
@@ -1167,9 +1224,12 @@ var export_trial = {
 		console.log('Final prediction trials:', prediction_trials);
 		console.log('Final outcome trials:', outcome_trials);
 
-		// Combine all trials
+		// Combine all trials and add the note-taking response
 		const experiment_data = {
-			p_info: participant_info,  // Use the participant info from the beginning
+			p_info: {
+				...participant_info,
+				took_notes: tookNotes  // Add note-taking response to participant info
+			},
 			design: design_data,
 			trials: [...prediction_trials, ...outcome_trials]
 		};
@@ -1192,19 +1252,58 @@ var export_trial = {
 			console.error('Error saving data:', error);
 		});
 		
+		// Check if this is a Prolific participant
+		const isProlific = participant_info.prolific;
+		
 		return `
 			<div style="text-align: center;">
 				<h2>${messages.completion.title}</h2>
 				<p>${messages.completion.text}</p>
+				<div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+					<p style="color: #495057; font-size: 16px;">
+						<strong>Note-taking response:</strong> ${tookNotes}
+					</p>
+				</div>
+				${isProlific ? `
+					<div style="margin-top: 30px; padding: 20px; background-color: #e8f4fd; border-radius: 8px; border: 1px solid #bee5eb;">
+						<h3 style="color: #2980b9; margin-bottom: 15px;">Redirecting to Prolific...</h3>
+						<p style="color: #6c757d;">You will be automatically redirected to Prolific in <span id="countdown">5</span> seconds.</p>
+						<p style="color: #6c757d; font-size: 14px;">If you are not redirected automatically, please click the button below.</p>
+					</div>
+				` : ''}
 			</div>
 		`;
 	},
-	choices: [messages.buttons.close],
+	choices: function() {
+		return participant_info.prolific ? ["Return to Prolific"] : [messages.buttons.close];
+	},
 	button_html: function(choice) {
-		return `<button class="jspsych-btn" style="background-color: #2980b9; color: white; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px;">${choice}</button>`;
+		const isProlific = participant_info.prolific;
+		const buttonText = isProlific ? "Return to Prolific" : choice;
+		return `<button class="jspsych-btn" style="background-color: #2980b9; color: white; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px;" onclick="${isProlific ? 'window.location.href=\'https://app.prolific.com/submissions/complete?cc=CSJREKX3\'' : ''}">${buttonText}</button>`;
+	},
+	on_load: function() {
+		// If this is a Prolific participant, start countdown and auto-redirect
+		if (participant_info.prolific) {
+			let countdown = 5;
+			const countdownElement = document.getElementById('countdown');
+			
+			const timer = setInterval(() => {
+				countdown--;
+				if (countdownElement) {
+					countdownElement.textContent = countdown;
+				}
+				
+				if (countdown <= 0) {
+					clearInterval(timer);
+					// Redirect to Prolific
+					window.location.href = 'https://app.prolific.com/submissions/complete?cc=CSJREKX3';
+				}
+			}, 1000);
+		}
 	}
 };
 
-timeline.push(export_trial);
+timeline.push(final_survey, export_trial);
 
 jsPsych.run(timeline);
