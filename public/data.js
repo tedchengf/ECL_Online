@@ -63,8 +63,8 @@ for (let i = 0; i < object_codes.length; i++) {
     }
 }
 
-// Take only the first 6 pairs for testing
-object_pairs = object_pairs.slice(0, 6);
+// // Take only the first 6 pairs for testing
+// object_pairs = object_pairs.slice(0, 6);
 
 //=============================================================================
 //                                 MESSAGES

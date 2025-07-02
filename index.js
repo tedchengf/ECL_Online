@@ -125,15 +125,15 @@ async function write_exp_data(req) {
 
     // Handle prediction trials
     if (trial.exp_type === 'prediction') {
-      insert_vals = [
+    insert_vals = [
         pid_s, trial.trial_number,
         quote(val_w_default(trial.exp_type, "")),
         quote(val_w_default(trial.exp_stim, "")),
         val_w_default(trial.response === 'true', false),  // Convert string 'true'/'false' to boolean
         val_w_default(trial.truth, false),  // Get truth from trial data
-        val_w_default(trial.rt, 0),
-        quote(JSON.stringify(trial))
-      ]
+      val_w_default(trial.rt, 0),
+      quote(JSON.stringify(trial))
+    ]
       await insert_table(pool, prediction_trials_table, insert_vals)
     }
     // Handle outcome trials
@@ -163,7 +163,7 @@ async function write_exp_data(req) {
   // Update subjects table. 
   const update_clause = "state = 'completed'" + (p_info.took_notes ? ", notes_usage = " + quote(p_info.took_notes) : "")
   await update_table(pool, subjects_table, update_clause, ["pid=" + pid_s])
-  console.log ("*** Subject " + p_info.pid + " logged as completed in " + subjects_table.name + " table")  
+  console.log ("*** Subject " + p_info.pid + " logged as completed in " + subjects_table.name + " table")
   
   // Add completion event to events table.
   insert_vals = [p_info.pid, 'completed', new Date().toUTCString()]
@@ -198,7 +198,7 @@ app.get("/", function (req, res) {
 
 app.post('/resetdb', async (req, res) => { 
   try {
-    //await delete_database(database)
+    await delete_database(pool, database)
     res.status(good_code).send(JSON.stringify({log_message: '### Database reset'}))
   } catch (err) {
     console.error("*** Handling error in resetdb dbtest...")

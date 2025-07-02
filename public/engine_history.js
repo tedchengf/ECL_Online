@@ -1126,6 +1126,11 @@ test_pairs.forEach(([obj1_code, obj2_code], index) => {
 // Add final survey before completion
 var final_survey = {
 	type: jsPsychSurveyMultiChoice,
+	preamble: `
+		<div style="max-width: 60%; margin: 0 auto;">
+			<h2 style="text-align: center;">Final Survey</h2>
+		</div>
+	`,
 	questions: [
 		{
 			prompt: "Before you leave, can you please let us know if use notes to complete the testing phase? You will receive your compensation regardless of your answer, so please answer honestly.",
@@ -1140,6 +1145,14 @@ var final_survey = {
 		}
 	],
 	button_label: "Submit",
+	on_load: function() {
+		// Apply 60% width constraint to the entire survey content
+		const surveyContainer = document.querySelector('#jspsych-survey-multi-choice-form');
+		if (surveyContainer) {
+			surveyContainer.style.maxWidth = '60%';
+			surveyContainer.style.margin = '0 auto';
+		}
+	},
 	on_finish: function(data) {
 		// Store the note-taking response
 		data.took_notes_response = data.response.took_notes;
@@ -1259,11 +1272,6 @@ var export_trial = {
 			<div style="text-align: center;">
 				<h2>${messages.completion.title}</h2>
 				<p>${messages.completion.text}</p>
-				<div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
-					<p style="color: #495057; font-size: 16px;">
-						<strong>Note-taking response:</strong> ${tookNotes}
-					</p>
-				</div>
 				${isProlific ? `
 					<div style="margin-top: 30px; padding: 20px; background-color: #e8f4fd; border-radius: 8px; border: 1px solid #bee5eb;">
 						<h3 style="color: #2980b9; margin-bottom: 15px;">Redirecting to Prolific...</h3>

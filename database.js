@@ -49,7 +49,7 @@ async function update_table(pool, table_spec, update_clause, where_clauses) {
 }
 
 async function delete_table(pool, table_name) {
-  if (await table_exists(table_name)) {
+  if (await table_exists(pool, table_name)) {
     console.log ('*** Deleting table ' + table_name)
     query = "DROP TABLE " + table_name + ";"
     await pool.query(query)
@@ -68,7 +68,7 @@ async function test_and_create_database(pool, database) {
 
 async function delete_database(pool, database) {
   for (let ti=0; ti < database.length; ti++) {
-    await delete_table(pool, database[ti])
+    await delete_table(pool, database[ti].name)
   }
 }
 
