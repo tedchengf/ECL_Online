@@ -15,12 +15,12 @@ const internal_error = 500
 // Define database tables.
 const cells_table = {
   name: 'cells',
-  col_types: {cell: 'VARCHAR UNIQUE', allocated: 'INTEGER', completed: 'INTEGER'}   
+  col_types: {cell: 'VARCHAR UNIQUE', allocated: 'INTEGER', completed: 'INTEGER', max_subjects: 'INTEGER'}   
 }
     
 const subjects_table = {
   name: 'subjects',
-  col_types: {pid: 'VARCHAR UNIQUE', cell: 'VARCHAR', state: 'VARCHAR', notes_usage: 'VARCHAR'}   
+  col_types: {pid: 'VARCHAR UNIQUE', cell: 'VARCHAR', state: 'VARCHAR', notes_usage: 'VARCHAR', rule_summary: 'TEXT'}   
 }
     
 const events_table = {
@@ -65,7 +65,9 @@ async function test_and_initialize_database(design) {
   if (await table_empty(pool, cells_table)) {
     // Initialize table with cells.
     for (let i=0; i < design.length; i++) {
-      insert_vals = [quote(JSON.stringify(design[i])), 0, 0]
+      const cell_config = design[i];
+      const max_subjects = cell_config.max_subjects;
+      insert_vals = [quote(JSON.stringify(cell_config)), 0, 0, max_subjects]
       insert_table(pool, cells_table, insert_vals)
     }
     console.log ('*** Table ' + cells_table.name + ' initialized')
@@ -79,18 +81,25 @@ async function get_cell(req) {
   const p_info = req.body.p_info
 
   // Allocate cell to subject.
-  // First identify the least allocated cells.
-  query = 'SELECT MIN(completed) as min FROM ' + cells_table.name + ';'
+  // First identify available cells (those that haven't reached their maximum)
+  query = 'SELECT * FROM ' + cells_table.name + ' WHERE completed < max_subjects;'
   var result = await pool.query(query)
-  query = 'SELECT * FROM ' + cells_table.name + ' WHERE completed=' + result.rows[0].min + ';'
-  var result = await pool.query(query)
-  // Randomly pick on of the least allocated cells.
-  idx = Math.floor(Math.random() * result.rows.length)
-  var cell_json = result.rows[idx].cell
+  
+  if (result.rows.length === 0) {
+    throw new Error('All cells have reached their maximum capacity');
+  }
+  
+  // Find the minimum completed count among available cells
+  const min_completed = Math.min(...result.rows.map(row => row.completed));
+  const available_cells = result.rows.filter(row => row.completed === min_completed);
+  
+  // Randomly pick one of the least completed available cells
+  idx = Math.floor(Math.random() * available_cells.length)
+  var cell_json = available_cells[idx].cell
 
   // Update cell's allocation count.
   await update_cell_table(cell_json, "allocated = allocated + 1")
-  console.log ("*** Cell " + cell_json + " allocated to " + p_info.pid)
+  console.log ("*** Cell " + cell_json + " allocated to " + p_info.pid + " (completed: " + available_cells[idx].completed + "/" + available_cells[idx].max_subjects + ")")
   
   // Add new subject to subjects table.
    insert_vals = [p_info.pid, cell_json, 'started', null]
@@ -161,7 +170,13 @@ async function write_exp_data(req) {
   console.log ("*** %d trials written to tables", trials.length)
 
   // Update subjects table. 
-  const update_clause = "state = 'completed'" + (p_info.took_notes ? ", notes_usage = " + quote(p_info.took_notes) : "")
+  let update_clause = "state = 'completed'"
+  if (p_info.took_notes) {
+    update_clause += ", notes_usage = " + quote(p_info.took_notes)
+  }
+  if (p_info.rule_summary) {
+    update_clause += ", rule_summary = " + quote(p_info.rule_summary)
+  }
   await update_table(pool, subjects_table, update_clause, ["pid=" + pid_s])
   console.log ("*** Subject " + p_info.pid + " logged as completed in " + subjects_table.name + " table")
   
@@ -244,6 +259,72 @@ app.post('/resultssave', async (req, res) => {
     res.status(internal_error).send(err.message);
   }
 });
+
+////////////////////////////////////////////
+
+// Debug endpoints for testing interface
+app.post('/debug/cells', async (req, res) => { 
+  try {
+    const query = 'SELECT cell, allocated, completed, max_subjects FROM ' + cells_table.name + ' ORDER BY cell;'
+    const result = await pool.query(query)
+    
+    const formatted_results = result.rows.map(row => ({
+      condition: JSON.parse(row.cell).name,
+      allocated: row.allocated,
+      completed: row.completed,
+      max_subjects: row.max_subjects,
+      remaining: row.max_subjects - row.completed
+    }))
+    
+    res.status(good_code).send(JSON.stringify(formatted_results, null, 2))
+  } catch (err) {
+    console.error("*** Error in debug/cells...")
+    console.error(err)
+    res.status(internal_error).send(err.message)
+  }
+})
+
+app.post('/debug/subjects', async (req, res) => { 
+  try {
+    const query = 'SELECT pid, cell, state, notes_usage, rule_summary FROM ' + subjects_table.name + ' ORDER BY pid DESC LIMIT 10;'
+    const result = await pool.query(query)
+    
+    const formatted_results = result.rows.map(row => ({
+      pid: row.pid,
+      condition: JSON.parse(row.cell).name,
+      state: row.state,
+      notes_usage: row.notes_usage,
+      rule_summary: row.rule_summary ? row.rule_summary.substring(0, 100) + '...' : null  // Truncate for readability
+    }))
+    
+    res.status(good_code).send(JSON.stringify(formatted_results, null, 2))
+  } catch (err) {
+    console.error("*** Error in debug/subjects...")
+    console.error(err)
+    res.status(internal_error).send(err.message)
+  }
+})
+
+app.post('/debug/rule_summaries', async (req, res) => { 
+  try {
+    const query = 'SELECT pid, cell, rule_summary FROM ' + subjects_table.name + ' WHERE rule_summary IS NOT NULL ORDER BY pid DESC;'
+    const result = await pool.query(query)
+    
+    const formatted_results = result.rows.map(row => ({
+      pid: row.pid,
+      condition: JSON.parse(row.cell).name,
+      rule_summary: row.rule_summary
+    }))
+    
+    res.status(good_code).send(JSON.stringify(formatted_results, null, 2))
+  } catch (err) {
+    console.error("*** Error in debug/rule_summaries...")
+    console.error(err)
+    res.status(internal_error).send(err.message)
+  }
+})
+
+////////////////////////////////////////////
 
 var server = app.listen (process.env.PORT, async function () {
   console.log ("*** Listening to port %d", server.address().port);

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Condition Assignment Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { 
+            background: #f0f0f0; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007cba;
+        }
+        .condition-info { 
+            background: #e8f5e8; 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-radius: 3px; 
+        }
+        .seq-truth-sample {
+            background: #fff3cd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        button { 
+            background: #007cba; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            margin: 5px; 
+            cursor: pointer;
+        }
+        button:hover { background: #005a8b; }
+    </style>
+    <script src="data.js"></script>
+</head>
+<body>
+    <h1>🧪 Condition Assignment Test</h1>
+    
+    <div>
+        <button onclick="testSingleAssignment()">Test Single Assignment</button>
+        <button onclick="testMultipleAssignments()">Test 10 Assignments</button>
+        <button onclick="checkDatabaseState()">Check Database State</button>
+        <button onclick="checkRuleSummaries()">Check Rule Summaries</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        const design_data = [
+            {name: 'ERCW', max_subjects: 30},
+            {name: 'ER_ECW', max_subjects: 45}, 
+            {name: 'ERC', max_subjects: 30},
+            {name: 'ER_EC', max_subjects: 15},
+            {name: 'ER', max_subjects: 15}
+        ];
+
+        function generateTestPID() {
+            return 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        }
+
+        async function testSingleAssignment() {
+            const pid = generateTestPID();
+            
+            try {
+                // Test getcell
+                const response = await fetch('/getcell', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        p_info: { pid: pid, prolific: false },
+                        design: design_data
+                    })
+                });
+                
+                const cell_data = await response.text();
+                const assigned_cell = JSON.parse(cell_data);
+                
+                // Test seq_truth assignment
+                let assigned_seq_truth;
+                switch(assigned_cell.name) {
+                    case 'ERCW': assigned_seq_truth = seq_truth_ERCW; break;
+                    case 'ER_ECW': assigned_seq_truth = seq_truth_ER_ECW; break;
+                    case 'ERC': assigned_seq_truth = seq_truth_ERC; break;
+                    case 'ER_EC': assigned_seq_truth = seq_truth_ER_EC; break;
+                    case 'ER': assigned_seq_truth = seq_truth_ER; break;
+                }
+                
+                // Test a few key truth values
+                const test_pairs = [4, 26, 34, 51];
+                const truth_sample = test_pairs.map(seq_id => ({
+                    seq_id: seq_id,
+                    truth: assigned_seq_truth[seq_id]
+                }));
+                
+                // Simulate completion - send fake trial data to mark participant as completed
+                await fetch('/resultssave', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        p_info: { 
+                            pid: pid, 
+                            cell: assigned_cell,
+                            prolific: false 
+                        },
+                        trials: [
+                            {
+                                exp_type: 'prediction',
+                                trial_number: 1,
+                                exp_stim: '2,17',
+                                response: 'true',
+                                truth: true,
+                                rt: 1000
+                            }
+                        ],
+                        design: design_data
+                    })
+                });
+                
+                displayResult({
+                    type: 'single',
+                    pid: pid,
+                    condition: assigned_cell.name,
+                    truth_sample: truth_sample,
+                    completed: true,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+                
+            } catch (error) {
+                displayResult({
+                    type: 'error',
+                    message: error.message,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            }
+        }
+
+        async function testMultipleAssignments() {
+            const results = [];
+            
+            for (let i = 0; i < 10; i++) {
+                const pid = generateTestPID();
+                
+                try {
+                    const response = await fetch('/getcell', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            p_info: { pid: pid, prolific: false },
+                            design: design_data
+                        })
+                    });
+                    
+                    const cell_data = await response.text();
+                    const assigned_cell = JSON.parse(cell_data);
+                    
+                    // Simulate completion for cumulative testing
+                    await fetch('/resultssave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            p_info: { 
+                                pid: pid, 
+                                cell: assigned_cell,
+                                prolific: false 
+                            },
+                            trials: [
+                                {
+                                    exp_type: 'prediction',
+                                    trial_number: 1,
+                                    exp_stim: '2,17',
+                                    response: 'true',
+                                    truth: true,
+                                    rt: 1000
+                                }
+                            ],
+                            design: design_data
+                        })
+                    });
+                    
+                    results.push({ pid: pid, condition: assigned_cell.name });
+                    
+                } catch (error) {
+                    results.push({ pid: pid, condition: 'ERROR: ' + error.message });
+                }
+            }
+            
+            // Count by condition
+            const condition_counts = {};
+            results.forEach(r => {
+                condition_counts[r.condition] = (condition_counts[r.condition] || 0) + 1;
+            });
+            
+            displayResult({
+                type: 'multiple',
+                results: results,
+                condition_counts: condition_counts,
+                timestamp: new Date().toLocaleTimeString()
+            });
+        }
+
+        async function checkDatabaseState() {
+            try {
+                const cellsResponse = await fetch('/debug/cells', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const subjectsResponse = await fetch('/debug/subjects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const cells = await cellsResponse.json();
+                const subjects = await subjectsResponse.json();
+                
+                displayResult({
+                    type: 'database',
+                    cells: cells,
+                    subjects: subjects,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+                
+            } catch (error) {
+                displayResult({
+                    type: 'error',
+                    message: 'Database check failed: ' + error.message,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            }
+        }
+
+        async function checkRuleSummaries() {
+            try {
+                const response = await fetch('/debug/rule_summaries', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const summaries = await response.json();
+                
+                displayResult({
+                    type: 'rule_summaries',
+                    summaries: summaries,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+                
+            } catch (error) {
+                displayResult({
+                    type: 'error',
+                    message: 'Rule summaries check failed: ' + error.message,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            }
+        }
+
+        function displayResult(result) {
+            const resultsDiv = document.getElementById('results');
+            let html = `<div class="test-result">`;
+            
+            if (result.type === 'single') {
+                html += `
+                    <h3>✅ Single Assignment Test - ${result.timestamp}</h3>
+                    <div class="condition-info">
+                        <strong>PID:</strong> ${result.pid}<br>
+                        <strong>Assigned Condition:</strong> ${result.condition}<br>
+                        <strong>Status:</strong> ${result.completed ? '✅ Completed' : '⏳ Started'}
+                    </div>
+                    <div class="seq-truth-sample">
+                        <strong>seq_truth Sample:</strong><br>
+                        ${result.truth_sample.map(t => `seq_id ${t.seq_id}: ${t.truth}`).join('<br>')}
+                    </div>
+                `;
+            } else if (result.type === 'multiple') {
+                html += `
+                    <h3>🔄 Multiple Assignment Test - ${result.timestamp}</h3>
+                    <div class="condition-info">
+                        <strong>Condition Distribution (All Completed):</strong><br>
+                        ${Object.entries(result.condition_counts).map(([cond, count]) => `${cond}: ${count}`).join('<br>')}
+                    </div>
+                    <details>
+                        <summary>Show all assignments</summary>
+                        ${result.results.map(r => `${r.pid} → ${r.condition} ✅`).join('<br>')}
+                    </details>
+                `;
+            } else if (result.type === 'database') {
+                html += `
+                    <h3>🗄️ Database State - ${result.timestamp}</h3>
+                    <div class="condition-info">
+                        <strong>Cells Status:</strong><br>
+                        ${result.cells.map(c => `${c.condition}: ${c.completed}/${c.max_subjects} (${c.remaining} remaining)`).join('<br>')}
+                    </div>
+                    <details>
+                        <summary>Recent Subjects (Last 10)</summary>
+                        ${result.subjects.map(s => `${s.pid} → ${s.condition} (${s.state})`).join('<br>')}
+                    </details>
+                `;
+            } else if (result.type === 'rule_summaries') {
+                html += `
+                    <h3>📝 Rule Summaries - ${result.timestamp}</h3>
+                    <div class="condition-info">
+                        <strong>Found ${result.summaries.length} rule summaries:</strong><br>
+                        ${result.summaries.map(s => `
+                            <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-left: 3px solid #007cba;">
+                                <strong>${s.pid} (${s.condition}):</strong><br>
+                                <em>"${s.rule_summary}"</em>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (result.type === 'error') {
+                html += `
+                    <h3>❌ Error - ${result.timestamp}</h3>
+                    <div style="color: red;">${result.message}</div>
+                `;
+            }
+            
+            html += `</div>`;
+            resultsDiv.innerHTML = html + resultsDiv.innerHTML;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html> 

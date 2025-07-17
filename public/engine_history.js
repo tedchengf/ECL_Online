@@ -38,7 +38,13 @@ if (prolific_pid) {
 	};
 }
 
-const design_data = [{name: 'EREC'}];
+const design_data = [
+	{name: 'ERCW', max_subjects: 30},
+	{name: 'ER_ECW', max_subjects: 45}, 
+	{name: 'ERC', max_subjects: 30},
+	{name: 'ER_EC', max_subjects: 15},
+	{name: 'ER', max_subjects: 15}
+];
 
 // Call getcell to register the subject
 fetch('/getcell', {
@@ -55,6 +61,36 @@ fetch('/getcell', {
 .then(cell_data => {
 	console.log('Participant registered, cell assigned:', cell_data);
 	participant_info.cell = JSON.parse(cell_data);
+	
+	// Set the appropriate seq_truth based on condition
+	const condition = participant_info.cell.name;
+	switch(condition) {
+		case 'ERCW':
+			window.seq_truth = seq_truth_ERCW;
+			break;
+		case 'ER_ECW':
+			window.seq_truth = seq_truth_ER_ECW;
+			break;
+		case 'ERC':
+			window.seq_truth = seq_truth_ERC;
+			break;
+		case 'ER_EC':
+			window.seq_truth = seq_truth_ER_EC;
+			break;
+		case 'ER':
+			window.seq_truth = seq_truth_ER;
+			break;
+	}
+	console.log('🎯 CONDITION DEBUG:', {
+		condition: condition,
+		seq_truth_sample: {
+			'seq_id_4': window.seq_truth[4],
+			'seq_id_26': window.seq_truth[26], 
+			'seq_id_34': window.seq_truth[34],
+			'seq_id_51': window.seq_truth[51]
+		},
+		total_entries: Object.keys(window.seq_truth).length
+	});
 })
 .catch((error) => {
 	console.error('Error registering participant:', error);
@@ -1123,6 +1159,40 @@ test_pairs.forEach(([obj1_code, obj2_code], index) => {
 	timeline.push(createTrial(obj1_code, obj2_code, index, test_pairs.length));
 });
 
+// Add rule summary survey before final survey
+var rule_summary_survey = {
+	type: jsPsychSurveyText,
+	preamble: `
+		<div style="max-width: 70%; margin: 0 auto;">
+			<h2 style="text-align: center;">Rule Summary</h2>
+		</div>
+	`,
+	questions: [
+		{
+			prompt: "Before we finish, please help us understand what you learned during the experiment. Summarize the rule you discovered. Be succinct, and if you couldn't find a rule let us know what trips you up. As a reminder, the objects vary in color (Red, Blue), shape (Circle, Triangle), and texture (Waves, Dots).",
+			placeholder: "Describe the rule you learned...",
+			rows: 6,
+			columns: 80,
+			required: true,
+			name: 'rule_summary'
+		}
+	],
+	button_label: "Continue",
+	on_load: function() {
+		// Apply width constraint to the survey content
+		const surveyContainer = document.querySelector('#jspsych-survey-text-form');
+		if (surveyContainer) {
+			surveyContainer.style.maxWidth = '70%';
+			surveyContainer.style.margin = '0 auto';
+		}
+	},
+	on_finish: function(data) {
+		// Store the rule summary response
+		data.rule_summary_response = data.response.rule_summary;
+		console.log('Rule summary captured:', data.rule_summary_response);
+	}
+};
+
 // Add final survey before completion
 var final_survey = {
 	type: jsPsychSurveyMultiChoice,
@@ -1163,9 +1233,15 @@ var final_survey = {
 var export_trial = {
 	type: jsPsychHtmlButtonResponse,
 	stimulus: function() {
-		// Get the note-taking response from the previous trial
-		const surveyData = jsPsych.data.getLastTrialData().values()[0];
-		const tookNotes = surveyData.took_notes_response;
+		// Get responses from the previous surveys
+		const allSurveys = jsPsych.data.get().filter({trial_type: 'survey-multi-choice'}).values();
+		const textSurveys = jsPsych.data.get().filter({trial_type: 'survey-text'}).values();
+		
+		// Get the note-taking response (last multi-choice survey)
+		const tookNotes = allSurveys.length > 0 ? allSurveys[allSurveys.length - 1].took_notes_response : null;
+		
+		// Get the rule summary response (should be the only text survey)
+		const ruleSummary = textSurveys.length > 0 ? textSurveys[textSurveys.length - 1].rule_summary_response : null;
 		
 		// Transform data to database format
 		const all_trials = jsPsych.data.get().filter({trial_type: 'survey-multi-select'}).values();
@@ -1237,11 +1313,12 @@ var export_trial = {
 		console.log('Final prediction trials:', prediction_trials);
 		console.log('Final outcome trials:', outcome_trials);
 
-		// Combine all trials and add the note-taking response
+		// Combine all trials and add both survey responses
 		const experiment_data = {
 			p_info: {
 				...participant_info,
-				took_notes: tookNotes  // Add note-taking response to participant info
+				took_notes: tookNotes,  // Add note-taking response to participant info
+				rule_summary: ruleSummary  // Add rule summary to participant info
 			},
 			design: design_data,
 			trials: [...prediction_trials, ...outcome_trials]
@@ -1312,6 +1389,6 @@ var export_trial = {
 	}
 };
 
-timeline.push(final_survey, export_trial);
+timeline.push(rule_summary_survey, final_survey, export_trial);
 
 jsPsych.run(timeline);

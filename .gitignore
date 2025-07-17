@@ -1,4 +1,7 @@
 node_modules/
 .DS_Store
 *.log
-.env 
+.env
+
+# Analysis output files
+output_analysis/ 

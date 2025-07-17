@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ECL Survey Test</title>
+    <script src="jspsych/jspsych.js"></script>
+    <script src="jspsych/plugin-html-keyboard-response.js"></script>
+    <script src="jspsych/plugin-survey-text.js"></script>
+    <script src="jspsych/plugin-survey-multi-choice.js"></script>
+    <link href="jspsych/jspsych.css" rel="stylesheet" type="text/css" />
+    <style>
+        body {
+            margin: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .survey-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="survey-container">
+        <div id="jspsych-target"></div>
+    </div>
+
+    <script>
+        var jsPsych = initJsPsych({
+            display_element: 'jspsych-target',
+            on_finish: function(data) {
+                console.log('Survey data:', data);
+                // Display the results
+                document.querySelector('#jspsych-target').innerHTML = 
+                    '<h2>Survey Test Complete!</h2>' +
+                    '<p>Check the console for the data output.</p>' +
+                    '<h3>Rule Summary:</h3>' +
+                    '<p><strong>' + data.trials[1].response.Q0 + '</strong></p>' +
+                    '<h3>Note-taking Response:</h3>' +
+                    '<p><strong>' + data.trials[2].response.Q0 + '</strong></p>';
+            }
+        });
+
+        // Welcome message
+        var welcome = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+                <h1>Survey Layout Test</h1>
+                <p>This page tests just the final surveys without going through all the trials.</p>
+                <p>Press any key to continue to the surveys.</p>
+            `
+        };
+
+        // Rule Summary Survey (from engine_history.js)
+        var rule_summary_survey = {
+            type: jsPsychSurveyText,
+            questions: [
+                {
+                    prompt: "Please summarize the rule you discovered. Be succinct, and if you couldn't find a rule let us know what trips you up. As a reminder, the objects vary in <strong>color (Red, Blue)</strong>, <strong>shape (Circle, Triangle)</strong>, and <strong>texture (Waves, Dots)</strong>.",
+                    placeholder: "Describe the rule you learned...",
+                    rows: 6,
+                    columns: 80,
+                    required: true
+                }
+            ],
+            button_label: 'Continue'
+        };
+
+        // Note-taking Survey 
+        var notes_survey = {
+            type: jsPsychSurveyMultiChoice,
+            questions: [
+                {
+                    prompt: "During the experiment, did you use any notes (physical or digital) to help you remember patterns or rules?",
+                    name: 'notes_usage',
+                    options: [
+                        'Yes, I used physical notes (paper, etc.)',
+                        'Yes, I used digital notes (phone, computer, etc.)',
+                        'No, I did not use any notes.'
+                    ],
+                    required: true
+                }
+            ],
+            button_label: 'Complete Survey'
+        };
+
+        // Create timeline
+        var timeline = [welcome, rule_summary_survey, notes_survey];
+
+        // Run the experiment
+        jsPsych.run(timeline);
+    </script>
+</body>
+</html> 
